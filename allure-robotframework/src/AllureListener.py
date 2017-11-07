@@ -5,6 +5,7 @@ from allure_commons.utils import now, uuid4
 from allure_commons.logger import AllureFileLogger
 from allure_commons import plugin_manager
 from robot.libraries.BuiltIn import BuiltIn
+from constants import *
 import utils
 
 class AllureListener(object):
@@ -80,7 +81,7 @@ class AllureListener(object):
         return uuid.rsplit('-', 1)[0]
 
     def _get_allure_status(self, status):
-        return Status.PASSED if status == 'PASS' else Status.FAILED
+        return Status.PASSED if status == RobotStatus.PASSED else Status.FAILED
 
     def _get_allure_parameters(self, parameters):
         return [Parameter(name="arg{}".format(i + 1), value=param) for i, param in enumerate(parameters)]
