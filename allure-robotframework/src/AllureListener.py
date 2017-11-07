@@ -51,6 +51,7 @@ class AllureListener(object):
         test = self.reporter.get_test(uuid)
         test.status = self._get_allure_status(attributes.get('status'))
         test.labels.extend(self._get_allure_suites(attributes.get('longname')))
+        test.labels.extend(self._get_allure_tags(attributes.get('tags')))
         self.reporter.close_test(uuid)
 
     def start_keyword(self, name, attributes):
@@ -94,3 +95,6 @@ class AllureListener(object):
         labels.extend([Label('suite', suites.pop(0)),
                        Label('subSuite', '.'.join(suites[:-1]))])
         return labels
+
+    def _get_allure_tags(self, tags):
+        return [Label('tag', tag) for tag in tags]
