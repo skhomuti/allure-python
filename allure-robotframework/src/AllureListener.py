@@ -1,5 +1,5 @@
 
-from allure_commons.model2 import TestResultContainer, TestResult, TestStepResult, Status, Parameter
+from allure_commons.model2 import TestResultContainer, TestResult, TestStepResult, Status, Parameter, Label
 from allure_commons.reporter import AllureReporter
 from allure_commons.utils import now, uuid4
 from allure_commons.logger import AllureFileLogger
@@ -49,6 +49,7 @@ class AllureListener(object):
         uuid = self.executable_stack.pop()
         test = self.reporter.get_test(uuid)
         test.status = self._get_allure_status(attributes.get('status'))
+        test.labels.extend(self._get_allure_suites(attributes.get('longname')))
         self.reporter.close_test(uuid)
 
     def start_keyword(self, name, attributes):
@@ -83,3 +84,12 @@ class AllureListener(object):
 
     def _get_allure_parameters(self, parameters):
         return [Parameter(name="arg{}".format(i + 1), value=param) for i, param in enumerate(parameters)]
+
+    def _get_allure_suites(self, longname):
+        labels = []
+        suites = longname.split('.')
+        if len(suites) > 3:
+            labels.append(Label('parentSuite', suites.pop(0)))
+        labels.extend([Label('suite', suites.pop(0)),
+                       Label('subSuite', '.'.join(suites[:-1]))])
+        return labels
