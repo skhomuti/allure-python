@@ -1,6 +1,6 @@
 
 from allure_commons.model2 import TestResultContainer, TestResult, TestStepResult, TestAfterResult, TestBeforeResult,\
-    Status, Parameter, Label
+    Status, StatusDetails, Parameter, Label
 from allure_commons.reporter import AllureReporter
 from allure_commons.utils import now, uuid4
 from allure_commons.logger import AllureFileLogger
@@ -29,7 +29,7 @@ class AllureListener(object):
     def start_suite(self, name, attributes):
         uuid = self._get_uuid(attributes.get('id'))
         self.stack.append(uuid)
-        parent_suite = self.reporter.get_item(uuid=self._get_parent_uuid(uuid))
+        parent_suite = self.reporter.get_last_item(TestResultContainer)
         if parent_suite and not parent_suite.stop:
             parent_suite.children.append(uuid)
         suite = TestResultContainer(uuid=uuid,
@@ -51,7 +51,7 @@ class AllureListener(object):
             'description': attributes.get('doc'),
             'start': now()
         }
-        parent_suite = self.reporter.get_item(uuid=self._get_parent_uuid(uuid_group))
+        parent_suite = self.reporter.get_last_item(TestResultContainer)
         if parent_suite and not parent_suite.stop:
             parent_suite.children.append(uuid_group)
         test_group = TestResultContainer(uuid=uuid_group, **args)
@@ -91,6 +91,14 @@ class AllureListener(object):
         self.reporter.stop_step(uuid=uuid,
                                 status=self._get_allure_status(attributes.get('status')),
                                 stop=now())
+
+    def log_message(self, message):
+        # if message.get('level') == RobotLogLevel.FAIL or message.get('level') == RobotLogLevel.TRACE:
+        test_step = self.reporter.get_item(self.stack[-1])
+        if test_step.statusDetails:
+            test_step.statusDetails.message += '\n' + message.get('level') + ': ' + message.get('message')
+        else:
+            test_step.statusDetails = StatusDetails(message=message.get('level') + ': ' + message.get('message'))
 
     def start_fixture(self, name, attributes):
         uuid = uuid4()
