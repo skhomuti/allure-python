@@ -28,10 +28,10 @@ class AllureListener(object):
 
     def start_suite(self, name, attributes):
         uuid = self._get_uuid(attributes.get('id'))
-        self.stack.append(uuid)
-        parent_suite = self.reporter.get_last_item(TestResultContainer)
-        if parent_suite and not parent_suite.stop:
+        if self.stack:
+            parent_suite = self.reporter.get_item(self.stack[-1])
             parent_suite.children.append(uuid)
+        self.stack.append(uuid)
         suite = TestResultContainer(uuid=uuid,
                                     name=name,
                                     description=attributes.get('doc'),
@@ -51,9 +51,8 @@ class AllureListener(object):
             'description': attributes.get('doc'),
             'start': now()
         }
-        parent_suite = self.reporter.get_last_item(TestResultContainer)
-        if parent_suite and not parent_suite.stop:
-            parent_suite.children.append(uuid_group)
+        parent_suite = self.reporter.get_item(self.stack[-1])
+        parent_suite.children.append(uuid_group)
         test_group = TestResultContainer(uuid=uuid_group, **args)
         self.stack.extend([uuid_group, uuid])
         test_group.children.append(uuid)
@@ -73,7 +72,7 @@ class AllureListener(object):
         self.reporter.stop_group(uuid_group, stop=now())
 
     def start_keyword(self, name, attributes):
-        if attributes.get('type') != RobotTestType.KEYWORD:
+        if attributes.get('type') == RobotTestType.SETUP or attributes.get('type') == RobotTestType.TEARDOWN:
             self.start_fixture(name, attributes)
             return
         uuid = uuid4()
@@ -87,6 +86,9 @@ class AllureListener(object):
         self.reporter.start_step(parent_uuid=parent_uuid, uuid=uuid, step=step)
 
     def end_keyword(self, name, attributes):
+        if attributes.get('type') == RobotTestType.SETUP or attributes.get('type') == RobotTestType.TEARDOWN:
+            self.stop_fixture(name, attributes)
+            return
         uuid = self.stack.pop()
         self.reporter.stop_step(uuid=uuid,
                                 status=self._get_allure_status(attributes.get('status')),
@@ -102,7 +104,10 @@ class AllureListener(object):
 
     def start_fixture(self, name, attributes):
         uuid = uuid4()
-        parent_uuid = self.reporter.get_last_item(TestResultContainer).uuid
+        if isinstance(self.reporter.get_item(self.stack[-1]), TestResult):
+            parent_uuid = self.stack[-2]
+        else:
+            parent_uuid = self.stack[-1]
         self.stack.append(uuid)
         args = {
             'name': name,
@@ -116,7 +121,7 @@ class AllureListener(object):
             self.reporter.start_after_fixture(parent_uuid, uuid, TestAfterResult(**args))
 
     def stop_fixture(self, name, attributes):
-        uuid = self.reporter.get_last_item(TestResultContainer)
+        uuid = self.stack.pop()
         if attributes.get('type') == RobotTestType.SETUP:
             self.reporter.stop_before_fixture(uuid,
                                               status=self._get_allure_status(attributes.get('status')),
