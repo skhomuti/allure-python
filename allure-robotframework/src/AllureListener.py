@@ -1,9 +1,10 @@
 
 from allure_commons.model2 import TestResultContainer, TestResult, TestStepResult, TestAfterResult, TestBeforeResult,\
-    Status, StatusDetails, Parameter, Label
+    Status, Parameter, Label
 from allure_commons.reporter import AllureReporter
 from allure_commons.utils import now, uuid4
 from allure_commons.logger import AllureFileLogger
+from allure_commons.types import AttachmentType
 from allure_commons import plugin_manager
 from robot.libraries.BuiltIn import BuiltIn
 from constants import *
@@ -23,6 +24,7 @@ class AllureListener(object):
         self.reporter = AllureReporter()
         self.logger = AllureFileLogger(logger_path)
         self.stack = []
+        self.current_log_attach = ''
         plugin_manager.register(self.reporter)
         plugin_manager.register(self.logger)
 
@@ -78,6 +80,8 @@ class AllureListener(object):
         uuid = uuid4()
         parent_uuid = self.stack[-1]
         self.stack.append(uuid)
+        if attributes.get('assign'):
+            name = attributes.get('assign')[0] + ' = ' + name
         step = TestStepResult(id=attributes.get('id'),
                               name=name,
                               description=attributes.get('doc'),
@@ -90,17 +94,15 @@ class AllureListener(object):
             self.stop_fixture(name, attributes)
             return
         uuid = self.stack.pop()
+        if self.current_log_attach:
+            self.reporter.attach_data(uuid4(), self.current_log_attach, name='log', attachment_type=AttachmentType.TEXT)
+            self.current_log_attach = ''
         self.reporter.stop_step(uuid=uuid,
                                 status=self._get_allure_status(attributes.get('status')),
                                 stop=now())
 
     def log_message(self, message):
-        # if message.get('level') == RobotLogLevel.FAIL or message.get('level') == RobotLogLevel.TRACE:
-        test_step = self.reporter.get_item(self.stack[-1])
-        if test_step.statusDetails:
-            test_step.statusDetails.message += '\n' + message.get('level') + ': ' + message.get('message')
-        else:
-            test_step.statusDetails = StatusDetails(message=message.get('level') + ': ' + message.get('message'))
+        self.current_log_attach += '[{}] {} \n\n'.format(message.get('level'), message.get('message'))
 
     def start_fixture(self, name, attributes):
         uuid = uuid4()
@@ -122,6 +124,8 @@ class AllureListener(object):
 
     def stop_fixture(self, name, attributes):
         uuid = self.stack.pop()
+        if self.current_log_attach:
+            self.reporter.attach_data(uuid4(), self.current_log_attach, name='log', attachment_type=AttachmentType.TEXT)
         if attributes.get('type') == RobotTestType.SETUP:
             self.reporter.stop_before_fixture(uuid,
                                               status=self._get_allure_status(attributes.get('status')),
