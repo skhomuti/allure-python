@@ -1,6 +1,6 @@
 
 from allure_commons.model2 import TestResultContainer, TestResult, TestStepResult, TestAfterResult, TestBeforeResult,\
-    Status, Parameter, Label
+    Status, StatusDetails, Parameter, Label
 from allure_commons.reporter import AllureReporter
 from allure_commons.utils import now, uuid4
 from allure_commons.logger import AllureFileLogger
@@ -70,6 +70,7 @@ class AllureListener(object):
         test.status = self._get_allure_status(attributes.get('status'))
         test.labels.extend(self._get_allure_suites(attributes.get('longname')))
         test.labels.extend(self._get_allure_tags(attributes.get('tags')))
+        test.statusDetails = StatusDetails(message=attributes.get('message'))
         test.stop = now()
         self.reporter.close_test(uuid)
         self.reporter.stop_group(uuid_group, stop=now())
@@ -104,6 +105,9 @@ class AllureListener(object):
                                 stop=now())
 
     def log_message(self, message):
+        if message.get('level') == RobotLogLevel.FAIL:
+            statusDetails = StatusDetails(message=message.get('message'))
+            self.reporter.get_item(self.stack[-1]).statusDetails = statusDetails
         full_message = self.log_attach[self.stack[-1]] if self.stack[-1] in self.log_attach else ''
         self.log_attach[self.stack[-1]] = self.LOG_MESSAGE_FORMAT.format(full_message=full_message,
                                                                          level=message.get('level'),
