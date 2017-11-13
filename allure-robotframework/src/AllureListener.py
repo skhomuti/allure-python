@@ -1,9 +1,10 @@
 
 from allure_commons.model2 import TestResultContainer, TestResult, TestStepResult, TestAfterResult, TestBeforeResult,\
-    Status, StatusDetails, Parameter, Label
+    Status, Parameter, Label
 from allure_commons.reporter import AllureReporter
 from allure_commons.utils import now, uuid4
 from allure_commons.logger import AllureFileLogger
+from allure_commons.types import AttachmentType
 from allure_commons import plugin_manager
 from robot.libraries.BuiltIn import BuiltIn
 from constants import *
@@ -15,6 +16,7 @@ class AllureListener(object):
 
     ROBOT_LISTENER_API_VERSION = 2
     DEFAULT_OUTPUT_PATH = os.path.join('output', 'allure')
+    LOG_MESSAGE_FORMAT = '{full_message}\n\n[{level}] {message}'
 
     def __init__(self, logger_path=DEFAULT_OUTPUT_PATH):
         if not os.path.exists(logger_path):
@@ -23,15 +25,16 @@ class AllureListener(object):
         self.reporter = AllureReporter()
         self.logger = AllureFileLogger(logger_path)
         self.stack = []
+        self.log_attach = {}
         plugin_manager.register(self.reporter)
         plugin_manager.register(self.logger)
 
     def start_suite(self, name, attributes):
         uuid = self._get_uuid(attributes.get('id'))
-        self.stack.append(uuid)
-        parent_suite = self.reporter.get_last_item(TestResultContainer)
-        if parent_suite and not parent_suite.stop:
+        if self.stack:
+            parent_suite = self.reporter.get_item(self.stack[-1])
             parent_suite.children.append(uuid)
+        self.stack.append(uuid)
         suite = TestResultContainer(uuid=uuid,
                                     name=name,
                                     description=attributes.get('doc'),
@@ -51,9 +54,8 @@ class AllureListener(object):
             'description': attributes.get('doc'),
             'start': now()
         }
-        parent_suite = self.reporter.get_last_item(TestResultContainer)
-        if parent_suite and not parent_suite.stop:
-            parent_suite.children.append(uuid_group)
+        parent_suite = self.reporter.get_item(self.stack[-1])
+        parent_suite.children.append(uuid_group)
         test_group = TestResultContainer(uuid=uuid_group, **args)
         self.stack.extend([uuid_group, uuid])
         test_group.children.append(uuid)
@@ -73,36 +75,46 @@ class AllureListener(object):
         self.reporter.stop_group(uuid_group, stop=now())
 
     def start_keyword(self, name, attributes):
-        if attributes.get('type') != RobotTestType.KEYWORD:
+        if (attributes.get('type') == RobotTestType.SETUP
+            or attributes.get('type') == RobotTestType.TEARDOWN) \
+                and not isinstance(self.reporter.get_item(self.stack[-1]), TestStepResult):
             self.start_fixture(name, attributes)
             return
         uuid = uuid4()
         parent_uuid = self.stack[-1]
         self.stack.append(uuid)
-        step = TestStepResult(id=attributes.get('id'),
-                              name=name,
+        step_name = '{} = {}'.format(attributes.get('assign')[0], name) if attributes.get('assign') else name
+        step = TestStepResult(name=step_name,
                               description=attributes.get('doc'),
                               parameters=self._get_allure_parameters(attributes.get('args')),
                               start=now())
         self.reporter.start_step(parent_uuid=parent_uuid, uuid=uuid, step=step)
 
     def end_keyword(self, name, attributes):
+        if (attributes.get('type') == RobotTestType.SETUP
+            or attributes.get('type') == RobotTestType.TEARDOWN) \
+                and not isinstance(self.reporter.get_item(self.stack[-1]), TestStepResult):
+            self.stop_fixture(name, attributes)
+            return
         uuid = self.stack.pop()
+        if uuid in self.log_attach:
+            self.reporter.attach_data(uuid4(), self.log_attach.pop(uuid), name='Keyword Log', attachment_type=AttachmentType.TEXT)
         self.reporter.stop_step(uuid=uuid,
                                 status=self._get_allure_status(attributes.get('status')),
                                 stop=now())
 
     def log_message(self, message):
-        # if message.get('level') == RobotLogLevel.FAIL or message.get('level') == RobotLogLevel.TRACE:
-        test_step = self.reporter.get_item(self.stack[-1])
-        if test_step.statusDetails:
-            test_step.statusDetails.message += '\n' + message.get('level') + ': ' + message.get('message')
-        else:
-            test_step.statusDetails = StatusDetails(message=message.get('level') + ': ' + message.get('message'))
+        full_message = self.log_attach[self.stack[-1]] if self.stack[-1] in self.log_attach else ''
+        self.log_attach[self.stack[-1]] = self.LOG_MESSAGE_FORMAT.format(full_message=full_message,
+                                                                         level=message.get('level'),
+                                                                         message=message.get('message').encode('UTF-8'))
 
     def start_fixture(self, name, attributes):
         uuid = uuid4()
-        parent_uuid = self.reporter.get_last_item(TestResultContainer).uuid
+        if isinstance(self.reporter.get_item(self.stack[-1]), TestResult):
+            parent_uuid = self.stack[-2]
+        else:
+            parent_uuid = self.stack[-1]
         self.stack.append(uuid)
         args = {
             'name': name,
@@ -116,7 +128,9 @@ class AllureListener(object):
             self.reporter.start_after_fixture(parent_uuid, uuid, TestAfterResult(**args))
 
     def stop_fixture(self, name, attributes):
-        uuid = self.reporter.get_last_item(TestResultContainer)
+        uuid = self.stack.pop()
+        if uuid in self.log_attach:
+            self.reporter.attach_data(uuid4(), self.log_attach.pop(uuid), name='Keyword Log', attachment_type=AttachmentType.TEXT)
         if attributes.get('type') == RobotTestType.SETUP:
             self.reporter.stop_before_fixture(uuid,
                                               status=self._get_allure_status(attributes.get('status')),
