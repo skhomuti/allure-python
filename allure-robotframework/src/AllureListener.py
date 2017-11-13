@@ -16,6 +16,7 @@ class AllureListener(object):
 
     ROBOT_LISTENER_API_VERSION = 2
     DEFAULT_OUTPUT_PATH = os.path.join('output', 'allure')
+    LOG_MESSAGE_FORMAT = '{full_message}\n\n[{level}] {message}'
 
     def __init__(self, logger_path=DEFAULT_OUTPUT_PATH):
         if not os.path.exists(logger_path):
@@ -24,7 +25,7 @@ class AllureListener(object):
         self.reporter = AllureReporter()
         self.logger = AllureFileLogger(logger_path)
         self.stack = []
-        self.current_log_attach = ''
+        self.log_attach = {}
         plugin_manager.register(self.reporter)
         plugin_manager.register(self.logger)
 
@@ -74,35 +75,39 @@ class AllureListener(object):
         self.reporter.stop_group(uuid_group, stop=now())
 
     def start_keyword(self, name, attributes):
-        if attributes.get('type') == RobotTestType.SETUP or attributes.get('type') == RobotTestType.TEARDOWN:
+        if (attributes.get('type') == RobotTestType.SETUP
+            or attributes.get('type') == RobotTestType.TEARDOWN) \
+                and not isinstance(self.reporter.get_item(self.stack[-1]), TestStepResult):
             self.start_fixture(name, attributes)
             return
         uuid = uuid4()
         parent_uuid = self.stack[-1]
         self.stack.append(uuid)
-        if attributes.get('assign'):
-            name = attributes.get('assign')[0] + ' = ' + name
-        step = TestStepResult(id=attributes.get('id'),
-                              name=name,
+        step_name = '{} = {}'.format(attributes.get('assign')[0], name) if attributes.get('assign') else name
+        step = TestStepResult(name=step_name,
                               description=attributes.get('doc'),
                               parameters=self._get_allure_parameters(attributes.get('args')),
                               start=now())
         self.reporter.start_step(parent_uuid=parent_uuid, uuid=uuid, step=step)
 
     def end_keyword(self, name, attributes):
-        if attributes.get('type') == RobotTestType.SETUP or attributes.get('type') == RobotTestType.TEARDOWN:
+        if (attributes.get('type') == RobotTestType.SETUP
+            or attributes.get('type') == RobotTestType.TEARDOWN) \
+                and not isinstance(self.reporter.get_item(self.stack[-1]), TestStepResult):
             self.stop_fixture(name, attributes)
             return
         uuid = self.stack.pop()
-        if self.current_log_attach:
-            self.reporter.attach_data(uuid4(), self.current_log_attach, name='log', attachment_type=AttachmentType.TEXT)
-            self.current_log_attach = ''
+        if uuid in self.log_attach:
+            self.reporter.attach_data(uuid4(), self.log_attach.pop(uuid), name='Keyword Log', attachment_type=AttachmentType.TEXT)
         self.reporter.stop_step(uuid=uuid,
                                 status=self._get_allure_status(attributes.get('status')),
                                 stop=now())
 
     def log_message(self, message):
-        self.current_log_attach += '[{}] {} \n\n'.format(message.get('level'), message.get('message'))
+        full_message = self.log_attach[self.stack[-1]] if self.stack[-1] in self.log_attach else ''
+        self.log_attach[self.stack[-1]] = self.LOG_MESSAGE_FORMAT.format(full_message=full_message,
+                                                                         level=message.get('level'),
+                                                                         message=message.get('message').encode('UTF-8'))
 
     def start_fixture(self, name, attributes):
         uuid = uuid4()
@@ -124,8 +129,8 @@ class AllureListener(object):
 
     def stop_fixture(self, name, attributes):
         uuid = self.stack.pop()
-        if self.current_log_attach:
-            self.reporter.attach_data(uuid4(), self.current_log_attach, name='log', attachment_type=AttachmentType.TEXT)
+        if uuid in self.log_attach:
+            self.reporter.attach_data(uuid4(), self.log_attach.pop(uuid), name='Keyword Log', attachment_type=AttachmentType.TEXT)
         if attributes.get('type') == RobotTestType.SETUP:
             self.reporter.stop_before_fixture(uuid,
                                               status=self._get_allure_status(attributes.get('status')),
