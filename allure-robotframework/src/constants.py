@@ -3,7 +3,7 @@ class RobotStatus(object):
     PASSED = 'PASS'
 
 
-class RobotTestType(object):
+class RobotKeywordType(object):
     SETUP = 'Setup'
     TEARDOWN = 'Teardown'
     KEYWORD = 'Keyword'
