@@ -21,16 +21,24 @@ class AllureListener(object):
     def __init__(self, logger_path=DEFAULT_OUTPUT_PATH):
         if not os.path.exists(logger_path):
             os.makedirs(logger_path)
-        utils.clear_directory(logger_path)
         self.reporter = AllureReporter()
         self.logger = AllureFileLogger(logger_path)
+        self.logger_path = logger_path
         self.stack = []
         self.log_attach = {}
+        self.pool_id = None
         plugin_manager.register(self.reporter)
         plugin_manager.register(self.logger)
 
     def start_suite(self, name, attributes):
-        uuid = self._get_uuid(attributes.get('id'))
+        if not self.pool_id:
+            self.pool_id = BuiltIn().get_variable_value('${PABOTEXECUTIONPOOLID}')
+            if self.pool_id == 1:
+                utils.clear_directory(self.logger_path)
+            elif not self.pool_id:
+                self.pool_id = 1
+
+        uuid = uuid4()
         if self.stack:
             parent_suite = self.reporter.get_item(self.stack[-1])
             parent_suite.children.append(uuid)
@@ -47,7 +55,7 @@ class AllureListener(object):
         self.reporter.stop_group(uuid, stop=now())
 
     def start_test(self, name, attributes):
-        uuid_group = self._get_uuid(attributes.get('id'))
+        uuid_group = uuid4()
         uuid = uuid4()
         args = {
             'name': name,
@@ -70,6 +78,7 @@ class AllureListener(object):
         test.status = self._get_allure_status(attributes.get('status'))
         test.labels.extend(self._get_allure_suites(attributes.get('longname')))
         test.labels.extend(self._get_allure_tags(attributes.get('tags')))
+        test.labels.append(self._get_allure_thread())
         test.statusDetails = StatusDetails(message=attributes.get('message'))
         test.stop = now()
         self.reporter.close_test(uuid)
@@ -144,16 +153,6 @@ class AllureListener(object):
                                              status=self._get_allure_status(attributes.get('status')),
                                              stop=now())
 
-    def _get_uuid(self, test_id):
-        pool_id = BuiltIn().get_variable_value('${PABOTEXECUTIONPOOLID}')
-        if pool_id:
-            return '{pool_id}-{test_id}'.format(pool_id=pool_id, test_id=test_id)
-        else:
-            return test_id
-
-    def _get_parent_uuid(self, uuid):
-        return uuid.rsplit('-', 1)[0]
-
     def _get_allure_status(self, status):
         return Status.PASSED if status == RobotStatus.PASSED else Status.FAILED
 
@@ -171,3 +170,6 @@ class AllureListener(object):
 
     def _get_allure_tags(self, tags):
         return [Label('tag', tag) for tag in tags]
+
+    def _get_allure_thread(self):
+        return Label('thread', 'Thread #{number}'.format(number=self.pool_id))
