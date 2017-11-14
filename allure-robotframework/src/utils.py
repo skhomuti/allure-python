@@ -1,4 +1,6 @@
 import os
+from allure_commons.model2 import Status, Label, Parameter
+from constants import RobotStatus
 
 
 def clear_directory(path):
@@ -9,3 +11,29 @@ def clear_directory(path):
                 os.unlink(file_path)
         except Exception as e:
             print(e)
+
+
+def get_allure_status(status):
+    return Status.PASSED if status == RobotStatus.PASSED else Status.FAILED
+
+
+def get_allure_parameters(parameters):
+    return [Parameter(name="arg{}".format(i + 1), value=param) for i, param in enumerate(parameters)]
+
+
+def get_allure_suites(longname):
+    labels = []
+    suites = longname.split('.')
+    if len(suites) > 3:
+        labels.append(Label('parentSuite', suites.pop(0)))
+    labels.extend([Label('suite', suites.pop(0)),
+                   Label('subSuite', '.'.join(suites[:-1]))])
+    return labels
+
+
+def get_allure_tags(tags):
+    return [Label('tag', tag) for tag in tags]
+
+
+def get_allure_thread(pool_id):
+    return Label('thread', 'Thread #{number}'.format(number=pool_id))

@@ -1,6 +1,6 @@
 
 from allure_commons.model2 import TestResultContainer, TestResult, TestStepResult, TestAfterResult, TestBeforeResult,\
-    Status, StatusDetails, Parameter, Label
+    StatusDetails
 from allure_commons.reporter import AllureReporter
 from allure_commons.utils import now, uuid4
 from allure_commons.logger import AllureFileLogger
@@ -33,10 +33,10 @@ class AllureListener(object):
     def start_suite(self, name, attributes):
         if not self.pool_id:
             self.pool_id = BuiltIn().get_variable_value('${PABOTEXECUTIONPOOLID}')
+            if not self.pool_id:
+                self.pool_id = 1
             if self.pool_id == 1:
                 utils.clear_directory(self.logger_path)
-            elif not self.pool_id:
-                self.pool_id = 1
 
         uuid = uuid4()
         if self.stack:
@@ -75,10 +75,10 @@ class AllureListener(object):
         uuid = self.stack.pop()
         uuid_group = self.stack.pop()
         test = self.reporter.get_test(uuid)
-        test.status = self._get_allure_status(attributes.get('status'))
-        test.labels.extend(self._get_allure_suites(attributes.get('longname')))
-        test.labels.extend(self._get_allure_tags(attributes.get('tags')))
-        test.labels.append(self._get_allure_thread())
+        test.status = utils.get_allure_status(attributes.get('status'))
+        test.labels.extend(utils.get_allure_suites(attributes.get('longname')))
+        test.labels.extend(utils.get_allure_tags(attributes.get('tags')))
+        test.labels.append(utils.get_allure_thread(self.pool_id))
         test.statusDetails = StatusDetails(message=attributes.get('message'))
         test.stop = now()
         self.reporter.close_test(uuid)
@@ -96,7 +96,7 @@ class AllureListener(object):
         step_name = '{} = {}'.format(attributes.get('assign')[0], name) if attributes.get('assign') else name
         step = TestStepResult(name=step_name,
                               description=attributes.get('doc'),
-                              parameters=self._get_allure_parameters(attributes.get('args')),
+                              parameters=utils.get_allure_parameters(attributes.get('args')),
                               start=now())
         self.reporter.start_step(parent_uuid=parent_uuid, uuid=uuid, step=step)
 
@@ -108,9 +108,12 @@ class AllureListener(object):
             return
         uuid = self.stack.pop()
         if uuid in self.log_attach:
-            self.reporter.attach_data(uuid4(), self.log_attach.pop(uuid), name='Keyword Log', attachment_type=AttachmentType.TEXT)
+            self.reporter.attach_data(uuid=uuid4(),
+                                      body=self.log_attach.pop(uuid),
+                                      name='Keyword Log',
+                                      attachment_type=AttachmentType.TEXT)
         self.reporter.stop_step(uuid=uuid,
-                                status=self._get_allure_status(attributes.get('status')),
+                                status=utils.get_allure_status(attributes.get('status')),
                                 stop=now())
 
     def log_message(self, message):
@@ -132,7 +135,7 @@ class AllureListener(object):
         args = {
             'name': name,
             'description': attributes.get('doc'),
-            'parameters': self._get_allure_parameters(attributes.get('args')),
+            'parameters': utils.get_allure_parameters(attributes.get('args')),
             'start': now()
         }
         if attributes.get('type') == RobotTestType.SETUP:
@@ -143,33 +146,16 @@ class AllureListener(object):
     def stop_fixture(self, name, attributes):
         uuid = self.stack.pop()
         if uuid in self.log_attach:
-            self.reporter.attach_data(uuid4(), self.log_attach.pop(uuid), name='Keyword Log', attachment_type=AttachmentType.TEXT)
+            self.reporter.attach_data(uuid=uuid4(),
+                                      body=self.log_attach.pop(uuid),
+                                      name='Keyword Log',
+                                      attachment_type=AttachmentType.TEXT)
         if attributes.get('type') == RobotTestType.SETUP:
             self.reporter.stop_before_fixture(uuid,
-                                              status=self._get_allure_status(attributes.get('status')),
+                                              status=utils.get_allure_status(attributes.get('status')),
                                               stop=now())
         elif attributes.get('type') == RobotTestType.TEARDOWN:
             self.reporter.stop_after_fixture(uuid,
-                                             status=self._get_allure_status(attributes.get('status')),
+                                             status=utils.get_allure_status(attributes.get('status')),
                                              stop=now())
 
-    def _get_allure_status(self, status):
-        return Status.PASSED if status == RobotStatus.PASSED else Status.FAILED
-
-    def _get_allure_parameters(self, parameters):
-        return [Parameter(name="arg{}".format(i + 1), value=param) for i, param in enumerate(parameters)]
-
-    def _get_allure_suites(self, longname):
-        labels = []
-        suites = longname.split('.')
-        if len(suites) > 3:
-            labels.append(Label('parentSuite', suites.pop(0)))
-        labels.extend([Label('suite', suites.pop(0)),
-                       Label('subSuite', '.'.join(suites[:-1]))])
-        return labels
-
-    def _get_allure_tags(self, tags):
-        return [Label('tag', tag) for tag in tags]
-
-    def _get_allure_thread(self):
-        return Label('thread', 'Thread #{number}'.format(number=self.pool_id))
