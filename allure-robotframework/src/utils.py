@@ -13,11 +13,9 @@ def _clear_directory(path):
             print(e)
 
 
-def prepare_log_directory(logger_path, pool_id):
+def prepare_log_directory(logger_path):
     if not os.path.exists(logger_path):
         os.makedirs(logger_path)
-    if pool_id == 1:
-        _clear_directory(logger_path)
 
 def get_allure_status(status):
     return Status.PASSED if status == RobotStatus.PASSED else Status.FAILED

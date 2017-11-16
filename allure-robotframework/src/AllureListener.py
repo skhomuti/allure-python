@@ -10,7 +10,7 @@ from robot.libraries.BuiltIn import BuiltIn
 from constants import *
 import utils
 import os
-
+from robot.api import logger
 
 class AllureListener(object):
 
@@ -21,19 +21,17 @@ class AllureListener(object):
     def __init__(self, logger_path=DEFAULT_OUTPUT_PATH):
         self.reporter = AllureReporter()
         self.logger = AllureFileLogger(logger_path)
-        self.logger_path = logger_path
         self.stack = []
         self.items_log = {}
         self.pool_id = None
+        utils.prepare_log_directory(logger_path)
         plugin_manager.register(self.reporter)
         plugin_manager.register(self.logger)
 
     def start_suite(self, name, attributes):
         if not self.pool_id:
             self.pool_id = BuiltIn().get_variable_value('${PABOTEXECUTIONPOOLID}')
-            if not self.pool_id:
-                self.pool_id = 1
-            utils.prepare_log_directory(self.logger_path, self.pool_id)
+            self.pool_id = int(self.pool_id) if self.pool_id else 0
         self.start_new_group(name, attributes)
 
     def end_suite(self, name, attributes):
@@ -98,7 +96,6 @@ class AllureListener(object):
     def start_new_keyword(self, name, attributes):
         uuid = uuid4()
         parent_uuid = self.stack[-1]
-        self.stack.append(uuid)
         step_name = '{} = {}'.format(attributes.get('assign')[0], name) if attributes.get('assign') else name
         args = {
             'name': step_name,
@@ -106,14 +103,18 @@ class AllureListener(object):
             'parameters': utils.get_allure_parameters(attributes.get('args')),
             'start': now()
         }
-        if not isinstance(self.reporter.get_item(self.stack[-1]), TestStepResult):
-            keyword_type = attributes.get('type')
+        keyword_type = attributes.get('type')
+        last_item = self.reporter.get_item(self.stack[-1])
+        if keyword_type in RobotKeywordType.FIXTURES and not isinstance(last_item, TestStepResult):
+            if isinstance(last_item, TestResult):
+                parent_uuid = self.stack[-2]
             if keyword_type == RobotKeywordType.SETUP:
                 self.reporter.start_before_fixture(parent_uuid, uuid, TestBeforeResult(**args))
-                return
             elif keyword_type == RobotKeywordType.TEARDOWN:
                 self.reporter.start_after_fixture(parent_uuid, uuid, TestAfterResult(**args))
-                return
+            self.stack.append(uuid)
+            return
+        self.stack.append(uuid)
         self.reporter.start_step(parent_uuid=parent_uuid,
                                  uuid=uuid,
                                  step=TestStepResult(**args))
@@ -130,8 +131,9 @@ class AllureListener(object):
             'status': utils.get_allure_status(attributes.get('status')),
             'stop': now()
         }
-        if isinstance(self.reporter.get_item(self.stack[-1]), TestStepResult):
-            keyword_type = attributes.get('type')
+        keyword_type = attributes.get('type')
+        parent_item = self.reporter.get_item(self.stack[-1])
+        if keyword_type in RobotKeywordType.FIXTURES and not isinstance(parent_item, TestStepResult):
             if keyword_type == RobotKeywordType.SETUP:
                 self.reporter.stop_before_fixture(**args)
                 return

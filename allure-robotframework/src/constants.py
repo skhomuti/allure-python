@@ -9,6 +9,8 @@ class RobotKeywordType(object):
     KEYWORD = 'Keyword'
     LOOP = 'FOR'
     LOOP_ITEM = 'FOR ITEM'
+    FIXTURES = [SETUP, TEARDOWN]
+
 
 class RobotLogLevel(object):
     FAIL = 'FAIL'
