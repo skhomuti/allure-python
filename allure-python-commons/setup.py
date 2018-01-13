@@ -1,8 +1,7 @@
-import sys
 from setuptools import setup
 
 PACKAGE = "allure-python-commons"
-VERSION = "2.2.3b1"
+VERSION = "2.2.4b1"
 
 classifiers = [
     'Development Status :: 4 - Beta',
@@ -15,11 +14,9 @@ classifiers = [
 install_requires = [
     "attrs>=16.0.0",
     "six>=1.9.0",
-    "pluggy>=0.4.0"
+    "pluggy>=0.4.0",
+    "enum34;python_version<'3.4'",
 ]
-
-if sys.version_info < (3, 4):
-    install_requires.append("enum34")
 
 
 def main():
@@ -38,6 +35,7 @@ def main():
         install_requires=install_requires,
         py_modules=['allure', 'allure_commons']
     )
+
 
 if __name__ == '__main__':
     main()

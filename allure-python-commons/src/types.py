@@ -40,10 +40,11 @@ class AttachmentType(Enum):
     TSV = ("text/tab-separated-values", "tsv")
     URI_LIST = ("text/uri-list", "uri")
 
-    HTML = ("application/html", "html")
+    HTML = ("text/html", "html")
     XML = ("application/xml", "xml")
     JSON = ("application/json", "json")
     YAML = ("application/yaml", "yaml")
+    PCAP = ("application/vnd.tcpdump.pcap", "pcap")
 
     PNG = ("image/png", "png")
     JPG = ("image/jpg", "jpg")
