@@ -1,5 +1,4 @@
-
-from allure_commons.model2 import TestResultContainer, TestResult, TestStepResult, TestAfterResult, TestBeforeResult,\
+from allure_commons.model2 import TestResultContainer, TestResult, TestStepResult, TestAfterResult, TestBeforeResult, \
     StatusDetails
 from allure_commons.reporter import AllureReporter
 from allure_commons.utils import now, uuid4
@@ -7,13 +6,12 @@ from allure_commons.logger import AllureFileLogger
 from allure_commons.types import AttachmentType
 from allure_commons import plugin_manager
 from robot.libraries.BuiltIn import BuiltIn
-from constants import *
+from constants import RobotKeywordType, RobotLogLevel
 import utils
 import os
-from robot.api import logger
+
 
 class AllureListener(object):
-
     ROBOT_LISTENER_API_VERSION = 2
     DEFAULT_OUTPUT_PATH = os.path.join('output', 'allure')
     LOG_MESSAGE_FORMAT = '{full_message}\n\n[{level}] {message}'

@@ -17,6 +17,7 @@ def prepare_log_directory(logger_path):
     if not os.path.exists(logger_path):
         os.makedirs(logger_path)
 
+
 def get_allure_status(status):
     return Status.PASSED if status == RobotStatus.PASSED else Status.FAILED
 
