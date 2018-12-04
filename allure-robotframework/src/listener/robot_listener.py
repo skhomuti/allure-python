@@ -130,7 +130,7 @@ class allure_robotframework(object):
         args = {
             'name': step_name,
             'description': attributes.get('doc'),
-            'parameters': utils.get_allure_parameters(attributes.get('args')),
+            'parameters': utils.get_allure_parameters(attributes.get('args'), name),
             'start': now()
         }
         keyword_type = attributes.get('type')
