@@ -1,13 +1,13 @@
 from __future__ import absolute_import
 from allure_commons.model2 import Status, Label, Parameter
 from allure_commons.types import LabelType
+from allure_commons.utils import func_parameters
 from allure_robotframework.types import RobotStatus
 from robot.libraries.BuiltIn import BuiltIn
 from robot.running.arguments import PythonArgumentParser
 from robot.running.arguments.argumentmapper import DefaultValue
 
 import inspect
-
 
 def get_allure_status(status):
     return Status.PASSED if status == RobotStatus.PASSED else Status.FAILED
@@ -23,7 +23,7 @@ def get_allure_parameters(parameters, name):
 
 def _get_keyword_by_name(library, keyword_name):
     members = inspect.getmembers(BuiltIn().get_library_instance(library), lambda x: all((
-        inspect.ismethod(x), inspect.isbuiltin(x) is False)))
+        inspect.isroutine(x), inspect.isbuiltin(x) is False)))
     for member_name, member in members:
         if member_name == keyword_name:
             return member
@@ -32,10 +32,11 @@ def _get_keyword_by_name(library, keyword_name):
 def _parse_keyword_params(keyword, params):
     parse = PythonArgumentParser().parse(keyword)
     position, named = parse.map(*parse.resolve(params), replace_defaults=False)
-    params_dict = {}
-    for key, value in zip(parse.positional, position):
-        params_dict[key] = value.value if isinstance(value, DefaultValue) else value
-    return params_dict
+    position = list(map(lambda x: x.value if isinstance(x, DefaultValue) else x, position))
+    if inspect.isfunction(keyword):
+        return func_parameters(keyword, *position, **dict(named))
+    else:
+        return func_parameters(keyword, None, *position, **dict(named))
 
 
 def get_allure_suites(longname):
