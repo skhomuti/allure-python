@@ -4,6 +4,8 @@ from allure_commons.types import LabelType
 from allure_robotframework.types import RobotStatus
 from robot.libraries.BuiltIn import BuiltIn
 from robot.running.arguments import PythonArgumentParser
+from robot.running.arguments.argumentmapper import DefaultValue
+
 import inspect
 
 
@@ -14,23 +16,26 @@ def get_allure_status(status):
 def get_allure_parameters(parameters, name):
     library, keyword_name = name.split('.', maxsplit=1)
     keyword_name = keyword_name.lower().replace(' ', '_')
-    import logging
+    keyword = _get_keyword_by_name(library, keyword_name)
+    params = _parse_keyword_params(keyword, parameters)
+    return [Parameter(name=name, value=value) for name, value in params.items()]
+
+
+def _get_keyword_by_name(library, keyword_name):
     members = inspect.getmembers(BuiltIn().get_library_instance(library), lambda x: all((
         inspect.ismethod(x), inspect.isbuiltin(x) is False)))
     for member_name, member in members:
-        if member_name == keyword_name.lower().replace(' ', '_'):
-            parse = PythonArgumentParser().parse(member)
-            position, named = parse.resolve(parameters)
-            logging.error(parse.defaults)
-            # args = inspect.signature(member)
-            # logging.error(parameters)
-            # args = args.bind(*parameters)
-            # logging.error(args.arguments)
-            # logging.error(args.args)
-            # logging.error(args.kwargs)
-            break
+        if member_name == keyword_name:
+            return member
 
-    return [Parameter(name="arg{}".format(i + 1), value=param) for i, param in enumerate(parameters)]
+
+def _parse_keyword_params(keyword, params):
+    parse = PythonArgumentParser().parse(keyword)
+    position, named = parse.map(*parse.resolve(params), replace_defaults=False)
+    params_dict = {}
+    for key, value in zip(parse.positional, position):
+        params_dict[key] = value.value if isinstance(value, DefaultValue) else value
+    return params_dict
 
 
 def get_allure_suites(longname):
