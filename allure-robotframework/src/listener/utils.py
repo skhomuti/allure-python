@@ -6,27 +6,42 @@ from allure_robotframework.types import RobotStatus
 from robot.libraries.BuiltIn import BuiltIn
 from robot.running.arguments import PythonArgumentParser
 from robot.running.arguments.argumentmapper import DefaultValue
-
+from robot.running.context import EXECUTION_CONTEXTS
 import inspect
+import logging
+from itertools import chain
 
 def get_allure_status(status):
     return Status.PASSED if status == RobotStatus.PASSED else Status.FAILED
 
 
 def get_allure_parameters(parameters, name):
-    library, keyword_name = name.split('.', maxsplit=1)
-    keyword_name = keyword_name.lower().replace(' ', '_')
+    kw_store = next(EXECUTION_CONTEXTS.namespaces)._kw_store
+    # for lib in chain(kw_store.resources.values(), (kw_store.user_keywords,)):
+        # for handler in lib.handlers:
+            # logging.error(handler.name)
+            # logging.error(handler.libname)
+            # logging.error(handler.arguments)
+    library, keyword_name = name.split('.', maxsplit=1) if '.' in name else (None, name)
     keyword = _get_keyword_by_name(library, keyword_name)
     params = _parse_keyword_params(keyword, parameters)
     return [Parameter(name=name, value=value) for name, value in params.items()]
 
 
+def _is_resource(library):
+    if library is None or library not in BuiltIn().get_library_instance(all=True):
+        return True
+    return False
+
+
 def _get_keyword_by_name(library, keyword_name):
+    keyword_name = keyword_name.lower().replace(' ', '_')
     members = inspect.getmembers(BuiltIn().get_library_instance(library), lambda x: all((
         inspect.isroutine(x), inspect.isbuiltin(x) is False)))
     for member_name, member in members:
         if member_name == keyword_name:
             return member
+    return None
 
 
 def _parse_keyword_params(keyword, params):
