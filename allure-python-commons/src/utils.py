@@ -298,8 +298,12 @@ def func_parameters(func, *args, **kwargs):
     [('a', '1'), ('b', '2')]
 
     """
-    parameters = {}
     arg_spec = getargspec(func) if six.PY2 else inspect.getfullargspec(func)
+    return func_argspec(arg_spec, *args, **kwargs)
+
+
+def func_argspec(arg_spec, *args, **kwargs):
+    parameters = {}
     arg_order = list(arg_spec.args)
     args_dict = dict(zip(arg_spec.args, args))
 

@@ -1,14 +1,13 @@
 from __future__ import absolute_import
 from allure_commons.model2 import Status, Label, Parameter
 from allure_commons.types import LabelType
-from allure_commons.utils import func_parameters
+from allure_commons.utils import func_parameters, func_argspec
 from allure_robotframework.types import RobotStatus
 from robot.libraries.BuiltIn import BuiltIn
 from robot.running.arguments import PythonArgumentParser
 from robot.running.arguments.argumentmapper import DefaultValue
 from robot.running.context import EXECUTION_CONTEXTS
 import inspect
-import logging
 from itertools import chain
 
 def get_allure_status(status):
@@ -16,16 +15,28 @@ def get_allure_status(status):
 
 
 def get_allure_parameters(parameters, name):
-    kw_store = next(EXECUTION_CONTEXTS.namespaces)._kw_store
-    # for lib in chain(kw_store.resources.values(), (kw_store.user_keywords,)):
-        # for handler in lib.handlers:
-            # logging.error(handler.name)
-            # logging.error(handler.libname)
-            # logging.error(handler.arguments)
     library, keyword_name = name.split('.', maxsplit=1) if '.' in name else (None, name)
-    keyword = _get_keyword_by_name(library, keyword_name)
-    params = _parse_keyword_params(keyword, parameters)
+    if _is_resource(library):
+        params = _get_keyword_params_by_resource(library, keyword_name, parameters)
+    else:
+        params = _get_keyword_params_by_library(library, keyword_name, parameters)
     return [Parameter(name=name, value=value) for name, value in params.items()]
+
+
+def _get_keyword_params_by_resource(library, keyword_name, parameters):
+    kw_store = next(EXECUTION_CONTEXTS.namespaces)._kw_store
+    for lib in chain(kw_store.resources.values(), (kw_store.user_keywords,)):
+        for handler in lib.handlers:
+            if handler.name == keyword_name and (handler.libname == library or library is None):
+                args = handler.arguments
+                args.args = args.positional
+                position, named = args.map(*args.resolve(parameters), replace_defaults=False)
+                return func_argspec(args, *position, **dict(named))
+
+
+def _get_keyword_params_by_library(library, keyword_name, parameters):
+    keyword = _get_keyword_by_name(library, keyword_name)
+    return _parse_keyword_params(keyword, parameters)
 
 
 def _is_resource(library):
