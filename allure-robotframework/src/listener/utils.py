@@ -10,21 +10,26 @@ from robot.running.context import EXECUTION_CONTEXTS
 import inspect
 from itertools import chain
 
+
 def get_allure_status(status):
     return Status.PASSED if status == RobotStatus.PASSED else Status.FAILED
 
 
 def get_allure_parameters(parameters, name):
     library, keyword_name = name.split('.', maxsplit=1) if '.' in name else (None, name)
+    if name == 'BuiltIn.Wait Until Keyword Succeeds':
+        return []
     if _is_resource(library):
         params = _get_keyword_params_by_resource(library, keyword_name, parameters)
     else:
         params = _get_keyword_params_by_library(library, keyword_name, parameters)
-    return [Parameter(name=name, value=value) for name, value in params.items()]
+    if params:
+        return [Parameter(name=name, value=value) for name, value in params.items()]
+    return []
 
 
 def _get_keyword_params_by_resource(library, keyword_name, parameters):
-    kw_store = next(EXECUTION_CONTEXTS.namespaces)._kw_store
+    kw_store = EXECUTION_CONTEXTS.current.namespace._kw_store
     for lib in chain(kw_store.resources.values(), (kw_store.user_keywords,)):
         for handler in lib.handlers:
             if handler.name == keyword_name and (handler.libname == library or library is None):
@@ -36,7 +41,8 @@ def _get_keyword_params_by_resource(library, keyword_name, parameters):
 
 def _get_keyword_params_by_library(library, keyword_name, parameters):
     keyword = _get_keyword_by_name(library, keyword_name)
-    return _parse_keyword_params(keyword, parameters)
+    if keyword:
+        return _parse_keyword_params(keyword, parameters)
 
 
 def _is_resource(library):
