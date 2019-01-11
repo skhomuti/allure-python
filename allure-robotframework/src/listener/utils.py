@@ -4,8 +4,13 @@ from allure_commons.types import LabelType
 from allure_robotframework.types import RobotStatus
 
 
-def get_allure_status(status):
-    return Status.PASSED if status == RobotStatus.PASSED else Status.FAILED
+def get_allure_status(status, traceback=None):
+    if status == RobotStatus.PASSED:
+        return Status.PASSED
+    elif status == RobotStatus.FAILED and traceback and 'AssertionError' not in traceback:
+        return Status.BROKEN
+    else:
+        return Status.FAILED
 
 
 def get_allure_parameters(parameters):

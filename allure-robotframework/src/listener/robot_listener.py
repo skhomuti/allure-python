@@ -107,7 +107,7 @@ class allure_robotframework(object):
     def stop_current_test(self, name, attributes):
         uuid = self.stack.pop()
         test = self.reporter.get_test(uuid)
-        test.status = utils.get_allure_status(attributes.get('status'))
+        traceback_message = self.get_traceback_message()
         test.labels.extend(utils.get_allure_suites(attributes.get('longname')))
 
         test.labels.extend(allure_tags(attributes))
@@ -119,7 +119,8 @@ class allure_robotframework(object):
         test.labels.append(Label(name=LabelType.HOST, value=host_tag()))
         test.labels.append(Label(name=LabelType.FRAMEWORK, value='robotframework'))
         test.labels.append(Label(name=LabelType.LANGUAGE, value=platform_label()))
-        test.statusDetails = StatusDetails(message=attributes.get('message'), trace=self.get_traceback_message())
+        test.statusDetails = StatusDetails(message=attributes.get('message'), trace=traceback_message)
+        test.status = utils.get_allure_status(attributes.get('status'), traceback_message)
         test.description = attributes.get('doc')
         last_link = list(self.links.values())[-1] if self.links else None
         if attributes.get(Severity.CRITICAL, 'no') == 'yes':
