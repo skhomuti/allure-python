@@ -24,6 +24,7 @@ from allure_robotframework.utils import allure_tags, allure_labels
 class allure_robotframework(object):
     ROBOT_LISTENER_API_VERSION = 2
     DEFAULT_OUTPUT_PATH = os.path.join('output', 'allure')
+    DEFAULT_EMPTY_TRACEBACK_MESSAGE = "Traceback (most recent call last):\n  None"
     LOG_MESSAGE_FORMAT = '{full_message}<p><b>[{level}]</b> {message}</p>'
     FAIL_MESSAGE_FORMAT = '{full_message}<p style="color: red"><b>[{level}]</b> {message}</p>'
 
@@ -68,7 +69,8 @@ class allure_robotframework(object):
     def log_message(self, message):
         level = message.get('level')
         if self._previous_keyword_failed:
-            self._traceback_message = message.get('message')
+            traceback = message.get('message')
+            self._traceback_message = traceback if traceback != self.DEFAULT_EMPTY_TRACEBACK_MESSAGE else None
             self._previous_keyword_failed = False
         if level == RobotLogLevel.FAIL:
             self._previous_keyword_failed = True
