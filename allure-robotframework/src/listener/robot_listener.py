@@ -71,7 +71,9 @@ class allure_robotframework(object):
         level = message.get('level')
         if self._previous_keyword_failed:
             traceback = message.get('message')
-            self._traceback_message = traceback if self._is_traceback(traceback) else None
+            self._traceback_message = traceback \
+                if traceback != self.DEFAULT_EMPTY_TRACEBACK_MESSAGE and self.DEFAULT_TRACEBACK_TITLE in traceback \
+                else None
             self._previous_keyword_failed = False
         if level == RobotLogLevel.FAIL:
             self._previous_keyword_failed = True
@@ -198,9 +200,6 @@ class allure_robotframework(object):
     def remove_suite_link(self, uuid):
         if self.links.get(uuid):
             self.links.pop(uuid)
-
-    def _is_traceback(self, traceback):
-        return traceback != self.DEFAULT_EMPTY_TRACEBACK_MESSAGE and self.DEFAULT_TRACEBACK_TITLE in traceback
 
     def get_traceback_message(self):
         if BuiltIn().get_variable_value('${LOG LEVEL}') in (RobotLogLevel.DEBUG, RobotLogLevel.TRACE):

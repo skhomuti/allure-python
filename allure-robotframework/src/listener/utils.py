@@ -7,7 +7,9 @@ from allure_robotframework.types import RobotStatus
 def get_allure_status(status, traceback=None):
     if status == RobotStatus.PASSED:
         return Status.PASSED
-    elif status == RobotStatus.FAILED and traceback and 'AssertionError' not in traceback:
+    elif status == RobotStatus.FAILED and traceback \
+            and 'raise AssertionError' not in traceback\
+            and 'wait_until_keyword_succeeds' not in traceback:
         return Status.BROKEN
     else:
         return Status.FAILED
